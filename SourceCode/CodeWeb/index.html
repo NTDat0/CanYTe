@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng Theo Dõi Sức Khỏe</title>
+    <!-- <link rel="icon" href="favicon.ico" type="image/x-icon"> -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bảng Theo Dõi Sức Khỏe</h1>
+        </header>
+        <nav>
+            <a href="index.html" class="active">Bảng Điều Khiển</a>
+            <a href="history.html">Biểu Đồ</a>
+        </nav>
+        <section id="dashboard">
+            <h2>Chỉ Số Sức Khỏe Hiện Tại</h2>
+            <div class="time-container">
+                <p id="current-time">
+                    --/--/---- --:--:--
+                </p>
+            </div>
+            <div class="dashboard">
+                <!-- Các card chỉ số giữ nguyên -->
+                <div class="card" data-metric="temperature" onclick="showModal('temperature', this)">
+                    <i class="fas fa-thermometer-half icon"></i>
+                    <h3>Nhiệt Độ Môi Trường</h3>
+                    <p id="nhietdo">-- °C</p>
+                    <p class="card-alert-message"></p>
+                </div>
+                <div class="card" data-metric="humidity" onclick="showModal('humidity', this)">
+                    <i class="fas fa-tint icon"></i>
+                    <h3>Độ Ẩm</h3>
+                    <p id="doam">-- %</p>
+                    <p class="card-alert-message"></p>
+                </div>
+                <div class="card" data-metric="weight" onclick="showModal('weight', this)">
+                    <i class="fas fa-weight-scale icon"></i>
+                    <h3>Cân Nặng</h3>
+                    <p id="cannang">-- kg</p>
+                    <p class="card-alert-message"></p>
+                </div>
+                <div class="card" data-metric="heartRate" onclick="showModal('heartRate', this)">
+                    <i class="fas fa-heart-pulse icon"></i>
+                    <h3>Nhịp Tim</h3>
+                    <p id="nhiptim">-- bpm</p>
+                    <p class="card-alert-message"></p>
+                </div>
+                <div class="card" data-metric="spo2" onclick="showModal('spo2', this)">
+                    <i class="fas fa-lungs icon"></i>
+                    <h3>SpO2</h3>
+                    <p id="spo2">-- %</p>
+                    <p class="card-alert-message"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Container chính cho Mẹo và Tin tức -->
+        <div class="content-layout">
+            <section id="health-tips" class="content-column">
+                <h2>Mẹo Sức Khỏe Hữu Ích</h2>
+                <div id="tips-content" class="tips-list">
+                    <!-- Nội dung mẹo sẽ được JS chèn vào đây -->
+                </div>
+            </section>
+
+            <aside id="news-section" class="content-column">
+                <h2>Tin Tức Sức Khỏe</h2>
+                <div class="news-list-scrollable" id="news-list-content">
+                    <!-- Liên kết tin tức sẽ được thêm vào đây (hiện tại là tĩnh) -->
+                    <div class="news-item">
+                        <a href="https://suckhoedoisong.vn/" target="_blank" rel="noopener noreferrer">
+                            Đọc thêm tin tức tại Báo Sức Khỏe & Đời Sống
+                            <span class="news-source">suckhoedoisong.vn</span>
+                        </a>
+                    </div>
+                    <div class="news-item">
+                        <a href="https://vnexpress.net/suc-khoe" target="_blank" rel="noopener noreferrer">
+                            Chuyên mục Sức khỏe trên VnExpress
+                            <span class="news-source">vnexpress.net</span>
+                        </a>
+                    </div>
+                    <div class="news-item">
+                        <a href="https://moh.gov.vn/web/guest/tin-tuc-su-kien" target="_blank" rel="noopener noreferrer">
+                            Tin tức & Sự kiện từ Bộ Y Tế
+                            <span class="news-source">moh.gov.vn</span>
+                        </a>
+                    </div>
+                    <div class="news-item">
+                        <a href="https://www.who.int/vietnam/vi/news" target="_blank" rel="noopener noreferrer">
+                            Tin tức từ Tổ chức Y tế Thế giới (WHO) tại Việt Nam
+                            <span class="news-source">who.int/vietnam</span>
+                        </a>
+                    </div>
+                     <div class="news-item">
+                        <a href="https://thanhnien.vn/suc-khoe/" target="_blank" rel="noopener noreferrer">
+                            Sức khỏe - Báo Thanh Niên
+                            <span class="news-source">thanhnien.vn</span>
+                        </a>
+                    </div>
+                    <div class="news-item">
+                        <a href="https://tuoitre.vn/suc-khoe.htm" target="_blank" rel="noopener noreferrer">
+                            Sức khỏe - Báo Tuổi Trẻ
+                            <span class="news-source">tuoitre.vn</span>
+                        </a>
+                    </div>
+                    <!-- Thêm nhiều tin hơn để test scroll -->
+                    <div class="news-item">
+                        <a href="https://nhandan.vn/y-te" target="_blank" rel="noopener noreferrer">
+                            Y tế - Báo Nhân Dân
+                            <span class="news-source">nhandan.vn</span>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+    </div>
+
+    <!-- Modal Structure -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()" title="Đóng">×</span>
+            <h2 id="modal-title"></h2>
+            <p id="modal-status"></p>
+            <p id="modal-warning" class="warning" style="display: none;"></p>
+            <h3>Khoảng Bình Thường</h3>
+            <p id="modal-healthy"></p>
+            <h3>Khoảng Không Lành Mạnh</h3>
+            <p id="modal-unhealthy"></p>
+            <h3>Lời Khuyên</h3>
+            <p id="modal-suggestions"></p>
+        </div>
+    </div>
+
+    <script src="script.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-analytics.js"></script>
+
+    <script defer>
+        // Firebase config và script cập nhật dữ liệu giữ nguyên như trước
+        var firebaseConfig = {
+            apiKey: "AIzaSyCf9WeBth1H_hj6ssY-uUXYR5b3RVszowI",
+            authDomain: "doan1-930dd.firebaseapp.com",
+            databaseURL: "https://doan1-930dd-default-rtdb.firebaseio.com",
+            projectId: "doan1-930dd",
+            storageBucket: "doan1-930dd.appspot.com",
+            messagingSenderId: "1034104989163",
+            appId: "1:1034104989163:web:db8ed9e26826914182e5ae",
+            measurementId: "G-5YJ94DTDP9"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        } else {
+            firebase.app(); 
+        }
+        if (typeof firebase.analytics === 'function') {
+             firebase.analytics();
+        }
+
+        var nhietDoElement = document.getElementById('nhietdo');
+        var doAmElement = document.getElementById('doam');
+        var canNangElement = document.getElementById('cannang');
+        var nhipTimElement = document.getElementById('nhiptim');
+        var spo2Element = document.getElementById('spo2');
+
+        const tempCard = document.querySelector('.card[data-metric="temperature"]');
+        const humidityCard = document.querySelector('.card[data-metric="humidity"]');
+        const weightCard = document.querySelector('.card[data-metric="weight"]');
+        const heartRateCard = document.querySelector('.card[data-metric="heartRate"]');
+        const spo2Card = document.querySelector('.card[data-metric="spo2"]');
+
+        var dbRefTemp = firebase.database().ref('sensors/temperature');
+        var dbRefHum = firebase.database().ref('sensors/humidity');
+        var dbRefWeight = firebase.database().ref('sensors/weight');
+        var dbRefHR = firebase.database().ref('sensors/heart_rate');
+        var dbRefSpO2 = firebase.database().ref('sensors/spo2');
+
+        function updateTipsOnDataChange() {
+            if (typeof updateHealthTips === 'function') {
+                updateHealthTips();
+            } else {
+                console.error("Hàm updateHealthTips không được định nghĩa!");
+            }
+        }
+
+        dbRefTemp.on('value', function(snap) {
+            const value = parseFloat(snap.val());
+            if (nhietDoElement) nhietDoElement.innerText = (isNaN(value) ? "--" : value.toFixed(1)) + " °C";
+            if (typeof updateCardAlert === 'function' && tempCard) {
+                updateCardAlert(tempCard, 'temperature', value);
+            }
+            updateTipsOnDataChange();
+        });
+
+        dbRefHum.on('value', function(snap) {
+            const value = parseFloat(snap.val());
+            if (doAmElement) doAmElement.innerText = (isNaN(value) ? "--" : value.toFixed(1)) + " %";
+            if (typeof updateCardAlert === 'function' && humidityCard) {
+                updateCardAlert(humidityCard, 'humidity', value);
+            }
+            updateTipsOnDataChange();
+        });
+
+        dbRefWeight.on('value', function(snap) {
+            const value = parseFloat(snap.val());
+            if (canNangElement) canNangElement.innerText = (isNaN(value) ? "--" : value.toFixed(1)) + " kg";
+            if (typeof updateCardAlert === 'function' && weightCard) {
+                updateCardAlert(weightCard, 'weight', value);
+            }
+            updateTipsOnDataChange();
+        });
+
+        dbRefHR.on('value', function(snap) {
+            const value = parseFloat(snap.val());
+            if (nhipTimElement) nhipTimElement.innerText = (isNaN(value) ? "--" : Math.round(value)) + " bpm";
+            if (typeof updateCardAlert === 'function' && heartRateCard) {
+                updateCardAlert(heartRateCard, 'heartRate', value);
+            }
+            updateTipsOnDataChange();
+        });
+
+        dbRefSpO2.on('value', function(snap) {
+            const value = parseFloat(snap.val());
+            if (spo2Element) spo2Element.innerText = (isNaN(value) ? "--" : Math.round(value)) + " %";
+            if (typeof updateCardAlert === 'function' && spo2Card) {
+                updateCardAlert(spo2Card, 'spo2', value);
+            }
+            updateTipsOnDataChange();
+        });
+    </script>
+
+    <script defer>
+        // Script thời gian giữ nguyên
+        function formatDateTime() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+        }
+
+        function updateCurrentTime() {
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.innerText = formatDateTime();
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+        });
+    </script>
+</body>
+</html>

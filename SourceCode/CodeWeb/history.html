@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biểu Đồ Sức Khỏe</title>
+    <!-- <link rel="icon" href="favicon.ico" type="image/x-icon"> --> <!-- Thêm Favicon của bạn ở đây -->
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header><h1>Biểu Đồ Sức Khỏe</h1></header>
+        <nav>
+            <a href="index.html">Bảng Điều Khiển</a>
+            <a href="history.html" class="active">Biểu Đồ</a>
+        </nav>
+        <section class="chart-container">
+            <h2>Chỉ Số Sức Khỏe Theo Thời Gian</h2> <!-- Sửa tiêu đề một chút -->
+            <div id="chartStatus" style="text-align: center; padding: 10px; color: var(--text-color-light,'#4B5563'); margin-bottom: 15px;">Đang khởi tạo...</div>
+            <!-- Sử dụng class .btn .btn-danger cho nút -->
+            <button id="clearHistoryButton" class="btn btn-danger" style="display: block; margin: 10px auto 20px auto;">Xóa Lịch Sử Cục Bộ (Bắt đầu mới)</button>
+            <div style="position: relative; min-height: 400px; height:60vh; width:100%">
+                 <canvas id="flowingLocalStorageChart"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.2.10/firebase-database.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log("EVENT: DOMContentLoaded loaded (Debug Step 2a).");
+            try {
+                var firebaseConfig = { /* ... Cấu hình Firebase của bạn ... */
+                    apiKey: "AIzaSyCf9WeBth1H_hj6ssY-uUXYR5b3RVszowI",
+                    authDomain: "doan1-930dd.firebaseapp.com",
+                    databaseURL: "https://doan1-930dd-default-rtdb.firebaseio.com",
+                    projectId: "doan1-930dd",
+                    storageBucket: "doan1-930dd.appspot.com",
+                    messagingSenderId: "1034104989163",
+                    appId: "1:1034104989163:web:db8ed9e26826914182e5ae",
+                };
+
+                const canvasElement = document.getElementById('flowingLocalStorageChart');
+                if (!canvasElement) { console.error("FATAL: Canvas not found!"); return; }
+                const ctx = canvasElement.getContext('2d');
+                const chartStatusElement = document.getElementById('chartStatus');
+                const clearHistoryButton = document.getElementById('clearHistoryButton');
+                let healthChart = null;
+
+                const DATA_STORAGE_KEY = 'healthChartFlowingData_v8_step2a';
+                const FIRST_RUN_FLAG_KEY = 'healthChartFirstRunFlag_v8_step2a';
+
+                const MAX_STORAGE_POINTS = 300;
+                const CHART_UPDATE_INTERVAL_MS = 300000;
+
+                let chartDisplayData = { temperature: [], humidity: [], weight: [], heart_rate: [], spo2: [] };
+                let lastKnownFirebaseData = { temperature: null, humidity: null, weight: null, heart_rate: null, spo2: null };
+                let lastFirebaseUpdateTimestamp = 0;
+                let firebaseConnectedOnce = false;
+                let chartUpdateIntervalId = null;
+                let initialFirebaseDataReceived = false;
+
+                function updateStatus(message) { if (chartStatusElement) chartStatusElement.textContent = message; console.log("STATUS:", message); }
+                function getCssVariable(variableName, fallbackColor = '#000000') { 
+                    try { const value = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim(); return value || fallbackColor; } catch (e) { return fallbackColor; }
+                }
+                function loadDataFromLocalStorage() { 
+                    updateStatus("Kiểm tra lịch sử cục bộ...");
+                    const isFirstRun = localStorage.getItem(FIRST_RUN_FLAG_KEY) === null;
+                    if (isFirstRun) {
+                        updateStatus("Lần chạy đầu tiên. Bắt đầu biểu đồ mới.");
+                        localStorage.setItem(FIRST_RUN_FLAG_KEY, 'false'); return false;
+                    }
+                    const storedDataString = localStorage.getItem(DATA_STORAGE_KEY);
+                    if (storedDataString) {
+                        try {
+                            const parsedData = JSON.parse(storedDataString);
+                            if (parsedData && Array.isArray(parsedData.temperature) && Array.isArray(parsedData.humidity) && Array.isArray(parsedData.weight) && Array.isArray(parsedData.heart_rate) && Array.isArray(parsedData.spo2)) {
+                                chartDisplayData = parsedData;
+                                if (chartDisplayData.temperature.length > 0) {
+                                    const lastIndex = chartDisplayData.temperature.length - 1;
+                                    if (chartDisplayData.temperature[lastIndex]?.y !== undefined) lastKnownFirebaseData.temperature = chartDisplayData.temperature[lastIndex].y;
+                                    if (chartDisplayData.humidity[lastIndex]?.y !== undefined) lastKnownFirebaseData.humidity = chartDisplayData.humidity[lastIndex].y;
+                                    if (chartDisplayData.weight[lastIndex]?.y !== undefined) lastKnownFirebaseData.weight = chartDisplayData.weight[lastIndex].y;
+                                    if (chartDisplayData.heart_rate[lastIndex]?.y !== undefined) lastKnownFirebaseData.heart_rate = chartDisplayData.heart_rate[lastIndex].y;
+                                    if (chartDisplayData.spo2[lastIndex]?.y !== undefined) lastKnownFirebaseData.spo2 = chartDisplayData.spo2[lastIndex].y;
+                                }
+                                updateStatus(`Đã tải ${chartDisplayData.temperature.length} điểm từ lịch sử.`); return true;
+                            } else { localStorage.removeItem(DATA_STORAGE_KEY); }
+                        } catch (e) { localStorage.removeItem(DATA_STORAGE_KEY); console.error("Error parsing LS:", e); }
+                    }
+                    updateStatus("Không có lịch sử cục bộ hợp lệ. Bắt đầu mới."); return false;
+                }
+                function saveDataToLocalStorage() { try { localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(chartDisplayData)); } catch (e) { console.error("Lỗi lưu LS:", e); }}
+                if(clearHistoryButton) { 
+                    clearHistoryButton.addEventListener('click', function() {
+                        if (confirm("Xóa lịch sử cục bộ? Thao tác này sẽ tải lại trang.")) {
+                            localStorage.removeItem(DATA_STORAGE_KEY); localStorage.removeItem(FIRST_RUN_FLAG_KEY);
+                            alert("Đã xóa lịch sử cục bộ. Trang sẽ được tải lại."); window.location.reload();
+                        }
+                    });
+                }
+
+                function createOrUpdateChart(isInitialCreation = false) {
+                    console.log("CHART (Step 2a): Attempting create/update. Is initial:", isInitialCreation, "Has healthChart:", !!healthChart);
+                    if (!healthChart) {
+                        try {
+                            if (typeof Chart === "undefined" || typeof Chart._adapters._date === "undefined") {
+                                updateStatus("LỖI: Thư viện Chart.js chưa sẵn sàng."); console.error("Chart.js or adapter not loaded."); return false;
+                            }
+                            // Lấy màu từ CSS variables để biểu đồ nhất quán hơn
+                            const redColor = getCssVariable('--danger-color', 'red');
+                            const blueColor = getCssVariable('--secondary-color', 'blue');
+                            const greenColor = getCssVariable('--success-color', 'green');
+                            const purpleColor = getCssVariable('--accent-color', 'purple'); // Using accent for purple
+                            const orangeColor = getCssVariable('--warning-color', 'orange');
+
+
+                            healthChart = new Chart(ctx, {
+                                type: 'line',
+                                data: { 
+                                    datasets: [
+                                        { label: 'Nhiệt Độ (°C)', data: chartDisplayData.temperature, borderColor: redColor, tension: 0.2, borderWidth: 2, pointBackgroundColor: redColor, pointRadius: 1, pointHoverRadius: 5 },
+                                        { label: 'Độ Ẩm (%)', data: chartDisplayData.humidity, borderColor: blueColor, tension: 0.2, borderWidth: 2, pointBackgroundColor: blueColor, pointRadius: 1, pointHoverRadius: 5 },
+                                        { label: 'Cân Nặng (kg)', data: chartDisplayData.weight, borderColor: greenColor, tension: 0.2, borderWidth: 2, pointBackgroundColor: greenColor, pointRadius: 1, pointHoverRadius: 5 },
+                                        { label: 'Nhịp Tim (bpm)', data: chartDisplayData.heart_rate, borderColor: purpleColor, tension: 0.2, borderWidth: 2, pointBackgroundColor: purpleColor, pointRadius: 1, pointHoverRadius: 5 },
+                                        { label: 'SpO2 (%)', data: chartDisplayData.spo2, borderColor: orangeColor, tension: 0.2, borderWidth: 2, pointBackgroundColor: orangeColor, pointRadius: 1, pointHoverRadius: 5 }
+                                    ]
+                                },
+                                options: { 
+                                    responsive: true, maintainAspectRatio: false,
+                                    animation: { duration: isInitialCreation ? 1000 : 0 },
+                                    scales: {
+                                        x: { 
+                                            type: 'time', 
+                                            title: { display: true, text: 'Thời gian', font: {size: 14}, color: getCssVariable('--text-color-light') },
+                                            ticks: { color: getCssVariable('--text-color-muted') }
+                                        },
+                                        y: { 
+                                            title: { display: true, text: 'Giá trị', font: {size: 14}, color: getCssVariable('--text-color-light') },
+                                            ticks: { color: getCssVariable('--text-color-muted') }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            labels: {
+                                                color: getCssVariable('--text-color'),
+                                                font: { size: 12 }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                            console.log("CHART (Step 2a): New Chart CREATED.");
+                            updateStatus(chartDisplayData.temperature.length > 0 ? `Đã vẽ ${chartDisplayData.temperature.length} điểm.` : "Biểu đồ rỗng. Chờ dữ liệu.");
+                            return true;
+                        } catch (e) { console.error("CHART EXCEPTION new (Step 2a):", e); updateStatus("LỖI TẠO BIỂU ĐỒ."); healthChart = null; return false; }
+                    } else {
+                        healthChart.data.datasets[0].data = chartDisplayData.temperature;
+                        healthChart.data.datasets[1].data = chartDisplayData.humidity;
+                        healthChart.data.datasets[2].data = chartDisplayData.weight;
+                        healthChart.data.datasets[3].data = chartDisplayData.heart_rate;
+                        healthChart.data.datasets[4].data = chartDisplayData.spo2;
+                        try { healthChart.update(isInitialCreation ? undefined : 'none'); } catch (e) { console.error("CHART EXCEPTION update (Step 2a):", e); }
+                        return true;
+                    }
+                }
+
+                function periodicFlowUpdate() { 
+                    if (!healthChart && !createOrUpdateChart(false)) { return; }
+                    const currentClientTimestamp = Date.now(); let dataPushedToChart = false;
+                    if (initialFirebaseDataReceived || chartDisplayData.temperature.length > 0) {
+                        if (Object.values(lastKnownFirebaseData).some(val => val !== null) || chartDisplayData.temperature.length > 0) {
+                            // Chỉ push giá trị nếu nó khác null, nếu không sẽ tạo ra các điểm "rỗng" trên biểu đồ
+                            const createPoint = (ts, val) => (val !== null ? { x: ts, y: val } : null);
+                            
+                            const tempPoint = createPoint(currentClientTimestamp, lastKnownFirebaseData.temperature);
+                            if (tempPoint) chartDisplayData.temperature.push(tempPoint);
+
+                            const humPoint = createPoint(currentClientTimestamp, lastKnownFirebaseData.humidity);
+                            if (humPoint) chartDisplayData.humidity.push(humPoint);
+                            
+                            const weightPoint = createPoint(currentClientTimestamp, lastKnownFirebaseData.weight);
+                            if (weightPoint) chartDisplayData.weight.push(weightPoint);
+
+                            const hrPoint = createPoint(currentClientTimestamp, lastKnownFirebaseData.heart_rate);
+                            if (hrPoint) chartDisplayData.heart_rate.push(hrPoint);
+
+                            const spo2Point = createPoint(currentClientTimestamp, lastKnownFirebaseData.spo2);
+                            if (spo2Point) chartDisplayData.spo2.push(spo2Point);
+                            
+                            // Nếu bất kỳ điểm nào được tạo, đánh dấu là đã đẩy dữ liệu
+                            if (tempPoint || humPoint || weightPoint || hrPoint || spo2Point) {
+                                dataPushedToChart = true;
+                            }
+
+                            // Giữ số lượng điểm tối đa (cần điều chỉnh logic shift nếu mảng không đồng đều)
+                            // Hiện tại, logic shift cũ vẫn hoạt động nhưng có thể dẫn đến các mảng không bằng nhau nếu 1 số giá trị là null thường xuyên
+                            // Để đơn giản, tạm giữ nguyên. Một giải pháp tốt hơn là lọc các điểm null trước khi shift hoặc shift dựa trên mảng dài nhất.
+                            while (chartDisplayData.temperature.length > MAX_STORAGE_POINTS) chartDisplayData.temperature.shift();
+                            while (chartDisplayData.humidity.length > MAX_STORAGE_POINTS) chartDisplayData.humidity.shift();
+                            while (chartDisplayData.weight.length > MAX_STORAGE_POINTS) chartDisplayData.weight.shift();
+                            while (chartDisplayData.heart_rate.length > MAX_STORAGE_POINTS) chartDisplayData.heart_rate.shift();
+                            while (chartDisplayData.spo2.length > MAX_STORAGE_POINTS) chartDisplayData.spo2.shift();
+                            
+                            saveDataToLocalStorage();
+                        }
+                    }
+                    createOrUpdateChart(false);
+                    const lastFirebaseMsg = lastFirebaseUpdateTimestamp > 0 ? `Firebase lúc: ${new Date(lastFirebaseUpdateTimestamp).toLocaleTimeString('vi-VN')}` : 'Chưa có từ Firebase';
+                    updateStatus(`${dataPushedToChart ? 'Đã thêm điểm.' : (initialFirebaseDataReceived ? 'Chờ thay đổi Fbase.' : 'Chờ Fbase kết nối.')} ${lastFirebaseMsg}`);
+                }
+
+                if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+                loadDataFromLocalStorage();
+                const initialChartDrawn = createOrUpdateChart(true);
+
+                if (initialChartDrawn) { 
+                    updateStatus("Đang thiết lập kết nối Firebase...");
+                    const sensorsRef = firebase.database().ref('sensors');
+                    sensorsRef.on('value', (snapshot) => {
+                        initialFirebaseDataReceived = true; const firebaseData = snapshot.val();
+                        if (firebaseData) {
+                            lastFirebaseUpdateTimestamp = Date.now(); let dataFirebaseActuallyChanged = false;
+                            
+                            const newTemp = firebaseData.temperature !== undefined ? parseFloat(firebaseData.temperature) : null;
+                            if (lastKnownFirebaseData.temperature !== newTemp) { lastKnownFirebaseData.temperature = newTemp; dataFirebaseActuallyChanged = true; }
+
+                            const newHum = firebaseData.humidity !== undefined ? parseFloat(firebaseData.humidity) : null;
+                            if (lastKnownFirebaseData.humidity !== newHum) { lastKnownFirebaseData.humidity = newHum; dataFirebaseActuallyChanged = true; }
+                            
+                            const newWeight = firebaseData.weight !== undefined ? parseFloat(firebaseData.weight) : null;
+                            if (lastKnownFirebaseData.weight !== newWeight) { lastKnownFirebaseData.weight = newWeight; dataFirebaseActuallyChanged = true; }
+
+                            const newHr = firebaseData.heart_rate !== undefined ? parseInt(firebaseData.heart_rate) : null;
+                            if (lastKnownFirebaseData.heart_rate !== newHr) { lastKnownFirebaseData.heart_rate = newHr; dataFirebaseActuallyChanged = true; }
+
+                            const newSpo2 = firebaseData.spo2 !== undefined ? parseInt(firebaseData.spo2) : null;
+                            if (lastKnownFirebaseData.spo2 !== newSpo2) { lastKnownFirebaseData.spo2 = newSpo2; dataFirebaseActuallyChanged = true; }
+
+
+                            if ((chartDisplayData.temperature.length === 0 && Object.values(lastKnownFirebaseData).some(v => v !== null)) || dataFirebaseActuallyChanged) {
+                                periodicFlowUpdate();
+                            } else if (!dataFirebaseActuallyChanged && chartDisplayData.temperature.length > 0) {
+                                updateStatus(`Dữ liệu Firebase không đổi. Chờ làm mới định kỳ. Firebase lúc: ${new Date(lastFirebaseUpdateTimestamp).toLocaleTimeString('vi-VN')}`);
+                            }
+                        } else { updateStatus("Không có dữ liệu tại /sensors từ Firebase."); }
+                    }, (error) => { console.error("Lỗi Firebase listener: ", error); updateStatus("Lỗi kết nối Firebase."); initialFirebaseDataReceived = true; });
+                    updateStatus("Đã thiết lập listener Firebase. Chờ dữ liệu...");
+                    if (chartUpdateIntervalId) clearInterval(chartUpdateIntervalId);
+                    chartUpdateIntervalId = setInterval(periodicFlowUpdate, CHART_UPDATE_INTERVAL_MS);
+                    console.log("Interval 'periodicFlowUpdate' started.");
+                } else {
+                    updateStatus("KHÔNG THỂ KHỞI TẠO BIỂU ĐỒ BAN ĐẦU.");
+                    console.error("Critical: Chart not initialized.");
+                }
+            } catch (mainError) { 
+                 console.error("MAIN SCRIPT ERROR (within DOMContentLoaded):", mainError, mainError.stack);
+                 const statusElem = document.getElementById('chartStatus');
+                 if (statusElem) { statusElem.textContent = "LỖI KỊCH BẢN CHÍNH. Kiểm tra Console."; statusElem.style.color = "red";
+                 } else { alert("LỖI KỊCH BẢN CHÍNH NGHIÊM TRỌNG! Kiểm tra Console."); }
+            }
+        });
+    </script>
+</body>
+</html>

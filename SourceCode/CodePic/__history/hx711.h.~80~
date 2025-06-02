@@ -1,0 +1,118 @@
+#ifndef HX711_H
+#define HX711_H
+
+// HX711 Pin Definitions
+#define HX711_DT_PIN  PIN_A0
+#define HX711_SCK_PIN PIN_A1
+
+// --- Configuration Constants ---
+#define NUM_SAMPLES_FOR_RAW_READ 30 // S? l?n g?i readCount_internal() d? l?y trung bình
+                                    // Dùng cho c? tare, l?y raw, và tính toán bình thu?ng.
+#define DEADZONE_RAW_DELTA 300      // Dùng cho ch? d? ho?t d?ng bình thu?ng
+
+// --- Ch? d? ho?t d?ng ---
+typedef enum {
+    MODE_NORMAL_WEIGHT,       // Ch? d? ho?t d?ng bình thu?ng, tr? v? tr?ng lu?ng dã scale
+    MODE_COLLECT_RAW_AVERAGE  // Ch? d? thu th?p d? li?u, hx711_get_units tr? v? GIÁ TR? THÔ TRUNG BÌNH
+} HX711_OperationMode;
+
+// !!! QUAN TR?NG: Ð?T CH? Ð? HO?T Ð?NG ? ÐÂY !!!
+// Ð? thu th?p d? li?u RAW, thay d?i thành: MODE_COLLECT_RAW_AVERAGE và biên d?ch l?i.
+static HX711_OperationMode current_hx711_mode = MODE_NORMAL_WEIGHT; // M?c d?nh
+
+// --- Global static variables ---
+static long HX711_OFFSET = 0;
+static double HX711_SCALE = 466.837; // Gi? giá tr? SCALE c?a b?n
+
+// --- Function Prototypes ---
+void hx711_init_pins(void);
+unsigned int32 readCount_internal(void);
+long getAverageOfRawCounts(int8 num_samples);
+void hx711_tare(int8 ignored_times);
+float hx711_get_units(int8 ignored_times);
+
+// --- Function Implementations ---
+
+void hx711_init_pins(void) {
+    output_low(HX711_SCK_PIN);
+}
+
+unsigned int32 readCount_internal(void) {
+    unsigned int32 data_value = 0;
+    unsigned int8 i;
+    unsigned int16 timeout_counter = 0;
+
+    output_low(HX711_SCK_PIN); 
+    delay_us(1);
+
+    // Ch? DT xu?ng th?p
+    while (input(HX711_DT_PIN)) {
+        delay_us(1);
+        if (++timeout_counter > 65000) return 0x7FFFFF; // Timeout
+    }
+
+    // Ð?c 24 bit d? li?u
+    for (i = 0; i < 24; i++) {
+        output_high(HX711_SCK_PIN); delay_us(1);
+        data_value = data_value << 1;
+        output_low(HX711_SCK_PIN); delay_us(1);
+        if (input(HX711_DT_PIN)) data_value++;
+    }
+
+    // Xung clock th? 25 (d?t gain 128)
+    output_high(HX711_SCK_PIN); delay_us(1);
+    data_value = data_value ^ 0x800000; // X? lý bù 2
+    output_low(HX711_SCK_PIN); delay_us(1);
+    return data_value;
+}
+
+// L?y trung bình c?a 'num_samples' l?n d?c t? readCount_internal()
+long getAverageOfRawCounts(int8 num_samples) {
+    unsigned long sum_of_raw_counts = 0;
+    if (num_samples < 1) num_samples = 1;
+    // Không gi?i h?n num_samples ? dây, d? NUM_SAMPLES_FOR_RAW_READ ki?m soát
+
+    for (int8 k = 0; k < num_samples; k++) {
+        sum_of_raw_counts += readCount_internal();
+    }
+    return (long)(sum_of_raw_counts / num_samples);
+}
+
+void hx711_tare(int8 ignored_times) {
+   // Tare s? d?a trên NUM_SAMPLES_FOR_RAW_READ (ví d?: 30 * 2 = 60 l?n d?c thô)
+   // Có th? tang s? l?n l?y trung bình cho tare n?u mu?n OFFSET ?n d?nh hon
+   HX711_OFFSET = getAverageOfRawCounts(NUM_SAMPLES_FOR_RAW_READ); 
+   // N?u mu?n tare k? hon:
+   // HX711_OFFSET = getAverageOfRawCounts(NUM_SAMPLES_FOR_RAW_READ * 2); 
+}
+
+float hx711_get_units(int8 ignored_times) {
+    if (current_hx711_mode == MODE_COLLECT_RAW_AVERAGE) {
+        // CH? Ð? THU TH?P D? LI?U THÔ:
+        // Tr? v? TR?C TI?P giá tr? thô trung bình t? getAverageOfRawCounts.
+        // Không tr? OFFSET, không chia SCALE, không áp d?ng deadzone.
+        return (float)getAverageOfRawCounts(NUM_SAMPLES_FOR_RAW_READ);
+    } else {
+        // CH? Ð? HO?T Ð?NG BÌNH THU?NG:
+        long current_raw_average = getAverageOfRawCounts(NUM_SAMPLES_FOR_RAW_READ);
+        long delta = current_raw_average - HX711_OFFSET;
+
+        // Áp d?ng deadzone ch? ? ch? d? bình thu?ng
+        if (delta < DEADZONE_RAW_DELTA && delta > -DEADZONE_RAW_DELTA) {
+            delta = 0;
+        }
+        
+        if (HX711_SCALE == 0.0) return 0.0; // Tránh chia cho 0
+        
+        float weight = (float)delta / HX711_SCALE;
+        return weight;
+    }
+}
+
+// Các hàm ti?n ích (b?n có th? không c?n g?i chúng t? main.c)
+void hx711_set_mode(HX711_OperationMode mode) { // Ð? có th? thay d?i mode b?ng code n?u mu?n
+    current_hx711_mode = mode;
+}
+// ... (các hàm getter/setter cho OFFSET, SCALE n?u c?n)
+
+#endif // HX711_H

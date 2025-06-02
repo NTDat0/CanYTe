@@ -1,0 +1,190 @@
+#include <16F877A.h>
+#fuses HS,NOWDT,NOPROTECT,NOLVP
+#use delay(clock=8000000)
+#use fast_io(D)
+#use fast_io(C)
+#use fast_io(B)
+#use standard_io(A)
+
+#include "lcd.h"
+#include "max30102.h"
+#include "dht11.h"
+#include "hx711.h"
+#include "uart.h"
+
+// --- Timing Interval Constants (in number of 5ms ticks) ---
+#define DHT11_INTERVAL_TICKS        100 // 100 * 5ms = 500ms
+#define HX711_INTERVAL_TICKS        20  // 20 * 5ms = 100ms
+#define DISPLAY_UART_INTERVAL_TICKS 50  // 50 * 5ms = 250ms
+
+// --- Other Constants ---
+#define WEIGHT_DEADBAND             2  // Ngu?ng ch?t cho cân n?ng (gram)
+
+// Kh?i lu?ng v?t m?u dã bi?t d? hi?u chu?n (b?n c?n d?t v?t này lên cân)
+// Ð?T GIÁ TR? NÀY CHO TR?NG LU?NG MÀ B?N S? DÙNG Ð? HI?U CHU?N
+#define KNOWN_WEIGHT_FOR_CALIBRATION 100.0 // Ví d?: 100.0 gram
+
+// Bi?n c? d? ki?m soát vi?c hi?u chu?n ch? ch?y m?t l?n
+int1 calibrate_done = FALSE;
+
+// Display number on LCD (support 2, 3, or 5 digits)
+void display_number(int32 num, int8 pos, int8 digits) {
+   if (num > 99 && digits == 2) num = 99; // Limit to 2 digits
+   if (num > 999 && digits == 3) num = 999; // Limit to 3 digits
+   if (num > 99999 && digits == 5) num = 99999; // Limit to 5 digits
+
+   char s[6];
+   if (digits == 2) {
+      sprintf(s, "%2lu", num);
+   } else if (digits == 3) {
+      sprintf(s, "%3lu", num);
+   } else { // 5 digits
+      sprintf(s, "%5lu", num);
+   }
+
+   LCD_SetPosition(pos);
+   for (int i = 0; i < digits; i++) {
+      if (s[i] == ' ') { // Replace space with underscore for better display on LCD
+         LCD_PutChar('_');
+      } else {
+         LCD_PutChar(s[i]);
+      }
+   }
+}
+
+
+void main() {
+   // --- Port Configuration ---
+   set_tris_d(0x00); // Port D as output (for LCD)
+   set_tris_c(0b00011000); // Port C, RC3, RC4 as input for I2C
+   set_tris_b(0xFF); // Port B as input (for DHT11)
+   set_tris_a(0x01); // Port A, A0 as input (HX711 DT), A1 as output (HX711 SCK)
+
+   // --- Module Initialization ---
+   LCD_Init();
+   max30102_init();
+   uart_init();
+
+   // --- MAX30102 Variable Initialization ---
+   hr_value = 0;
+   spo2_value = 0;
+   finger_detected = 0;
+   hr_update_counter = 0;
+   spo2_update_counter = 0;
+   finger_loss_counter = 0;
+
+   // --- HX711 Initialization ---
+   // ?n d?nh c?m bi?n HX711 b?ng cách d?c vài l?n
+   for (int i = 0; i < 5; i++) {
+      readCount();
+      delay_ms(10);
+   }
+   
+   // --- Hi?n th? nhãn tinh trên LCD ---
+   LCD_SetPosition(LINE_1);
+   LCD_PutChar('T'); LCD_PutChar(':'); LCD_PutChar(' ');
+   LCD_SetPosition(LINE_1 + 8);
+   LCD_PutChar('H'); LCD_PutChar(':'); LCD_PutChar(' ');
+
+   LCD_SetPosition(LINE_2);
+   LCD_PutChar('H'); LCD_PutChar('R'); LCD_PutChar(':'); LCD_PutChar(' ');
+   LCD_SetPosition(LINE_2 + 8);
+   LCD_PutChar('S'); LCD_PutChar('p'); LCD_PutChar('O'); LCD_PutChar('2'); LCD_PutChar(':'); LCD_PutChar(' ');
+
+   LCD_SetPosition(LINE_3);
+   LCD_PutChar('W'); LCD_PutChar('E'); LCD_PutChar('I'); LCD_PutChar('G'); LCD_PutChar('H'); LCD_PutChar('T'); LCD_PutChar(':'); LCD_PutChar(' ');
+   LCD_SetPosition(LINE_4);
+   LCD_PutChar(' '); // Dòng này có th? dùng d? hi?n th? tr?ng thái hi?u chu?n
+
+   // --- Timing Counters ---
+   int16 dht11_counter = 0;
+   int16 hx711_counter = 0;
+   int16 display_counter = 0;
+   int16 max30102_counter = 0; // Fixed: max30102_counter will be used correctly.
+
+   // --- Sensor Variables ---
+   unsigned int8 temp = 0;
+   unsigned int8 hum = 0;
+   int32 weight_grams = 0;
+
+   while (TRUE) {
+      // --- Quá trình hi?u chu?n HX711 (ch? ch?y m?t l?n) ---
+      if (!calibrate_done) {
+         // Bu?c 1: Tare cân khi không có gì trên dó
+         hx711_tare(1);
+         delay_ms(2000); // Ch? 2 giây d? cân ?n d?nh sau khi tare
+         
+         // HI?N TH? HU?NG D?N TRÊN LCD
+         LCD_SetPosition(LINE_4);
+         LCD_PutChar('P'); LCD_PutChar('L'); LCD_PutChar('A'); LCD_PutChar('C'); LCD_PutChar('E'); LCD_PutChar(' ');
+         LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' ');
+         LCD_PutChar('W'); LCD_PutChar('E'); LCD_PutChar('I'); LCD_PutChar('G'); LCD_PutChar('H'); LCD_PutChar('T');
+         
+         // Ch? m?t kho?ng th?i gian d? d? ngu?i dùng d?t v?t m?u lên
+         // Vì không có nút nh?n, b?n ph?i d?i th? công.
+         // Th?i gian này c?n d? dài d? b?n d?t v?t m?u lên cân sau khi n?p code
+         delay_ms(5000); // Ví d?: ch? 5 giây
+
+         // Bu?c 2: Hi?u chu?n v?i v?t m?u dã bi?t
+         // Ð?M B?O B?N ÐÃ Ð?T V?T M?U KNOWN_WEIGHT_FOR_CALIBRATION LÊN CÂN TRU?C TH?I ÐI?M NÀY
+         hx711_calibrate(KNOWN_WEIGHT_FOR_CALIBRATION);
+         delay_ms(1000); // Ch? 1 giây sau khi hi?u chu?n
+         
+         // Hi?n th? thông báo hi?u chu?n hoàn t?t
+         LCD_SetPosition(LINE_4);
+         LCD_PutChar('C'); LCD_PutChar('A'); LCD_PutChar('L'); LCD_PutChar('I'); LCD_PutChar('B'); LCD_PutChar(' ');
+         LCD_PutChar('D'); LCD_PutChar('O'); LCD_PutChar('N'); LCD_PutChar('E'); LCD_PutChar('!');
+         delay_ms(2000); // Hi?n th? 2 giây
+         LCD_SetPosition(LINE_4);
+         LCD_PutChar(' ');LCD_PutChar(' ');LCD_PutChar(' ');LCD_PutChar(' ');LCD_PutChar(' '); // Clear message
+         LCD_PutChar(' ');LCD_PutChar(' ');LCD_PutChar(' ');LCD_PutChar(' ');LCD_PutChar(' '); // Clear message
+
+         calibrate_done = TRUE; // Ð?t c? d? ch? ch?y m?t l?n
+      }
+
+
+      // --- MAX30102 ---
+      // Luu ý: max30102_counter = (max30102_counter + 1) % 1/5; là l?i cú pháp
+      // Vì 1/5 s? là 0 trong phép toán s? nguyên, di?u này khi?n counter luôn là 0
+      // và hàm d?c s? ch?y liên t?c.
+      // S?a thành m?t giá tr? h?p lý, ví d? 10 ticks (50ms)
+      if (max30102_counter == 0) {
+         max30102_read_and_display();
+      }
+      max30102_counter = (max30102_counter + 1) % 10; // C?p nh?t sau m?i 10 ticks (50ms)
+
+      // --- DHT11 ---
+      if (dht11_counter == 0) {
+         dht11_read(&temp, &hum);
+      }
+      dht11_counter = (dht11_counter + 1) % DHT11_INTERVAL_TICKS;
+
+      // --- HX711 ---
+      if (hx711_counter == 0) {
+         weight_grams = (int32)hx711_get_units(1); // Tham s? 1 không có tác d?ng
+         // Apply deadband (v?n gi? deadband ? dây, nhung HX711.h dã có deadband n?i b?)
+         if (weight_grams < WEIGHT_DEADBAND && weight_grams > -WEIGHT_DEADBAND) {
+            weight_grams = 0;
+         } else if (weight_grams < 0) { // If still negative after deadband, set to 0
+             weight_grams = 0;
+         }
+      }
+      hx711_counter = (hx711_counter + 1) % HX711_INTERVAL_TICKS;
+
+      // --- Display update and UART transmission ---
+      if (display_counter == 0) {
+         // Display values on LCD
+         display_number(temp, LINE_1 + 4, 2);
+         display_number(hum, LINE_1 + 12, 2);
+         display_number(hr_value, LINE_2 + 4, 3); // MAX HR is typically 2 or 3 digits
+         display_number(spo2_value, LINE_2 + 15, 2); // SPO2 is 2 digits
+         display_number(weight_grams, LINE_3 + 9, 5); // Weight can be up to 5 digits (99999g)
+
+         // Send data via UART
+         uart_send_data(temp, hum, hr_value, spo2_value, weight_grams);
+      }
+      display_counter = (display_counter + 1) % DISPLAY_UART_INTERVAL_TICKS;
+
+      delay_ms(5); // Base timing tick
+   }
+}

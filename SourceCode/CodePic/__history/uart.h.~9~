@@ -1,0 +1,61 @@
+#ifndef UART_H
+#define UART_H
+
+#include <16F877A.h>
+#include <string.h>
+
+#use rs232(baud=115200, xmit=PIN_C6, rcv=PIN_C7, stream=UART_STREAM)
+
+void uart_init() {
+   // UART du?c kh?i t?o b?i #use rs232
+}
+
+void uart_send_string(char *str) {
+   while (*str) {
+      putc(*str, UART_STREAM);
+      delay_us(100); // Ð?m b?o m?i ký t? du?c g?i hoàn ch?nh
+      str++;
+   }
+}
+
+void uart_send_data(unsigned int8 temp, unsigned int8 hum, int32 hr_value, int32 spo2_value, int32 weight_grams) {
+   char buffer[64]; // Tang kích thu?c b? d?m d? an toàn
+   int buffer_pos = 0;
+   int1 has_data = 0;
+
+   buffer[0] = '\0';
+
+   // Thêm nhi?t d?
+   if (temp != 0) {
+      buffer_pos += sprintf(buffer + buffer_pos, "T:%u ", (unsigned int)temp);
+      has_data = 1;
+   }
+   // Thêm d? ?m
+   if (hum != 0) {
+      buffer_pos += sprintf(buffer + buffer_pos, "H:%u ", (unsigned int)hum);
+      has_data = 1;
+   }
+   // Thêm nh?p tim
+   if (hr_value != 0) {
+      buffer_pos += sprintf(buffer + buffer_pos, "HR:%ld ", hr_value);
+      has_data = 1;
+   }
+   // Thêm SpO2
+   if (spo2_value != 0) {
+      buffer_pos += sprintf(buffer + buffer_pos, "SPO2:%ld ", spo2_value);
+      has_data = 1;
+   }
+   // Thêm cân n?ng
+   if (weight_grams != 0) {
+      buffer_pos += sprintf(buffer + buffer_pos, "W:%ld", weight_grams);
+      has_data = 1;
+   }
+
+   // Thêm ký t? xu?ng dòng và g?i n?u có d? li?u
+   if (has_data) {
+      buffer_pos += sprintf(buffer + buffer_pos, "\n");
+      uart_send_string(buffer);
+   }
+}
+
+#endif

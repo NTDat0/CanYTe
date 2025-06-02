@@ -1,0 +1,132 @@
+#include <16F877A.h>
+#fuses HS,NOWDT,NOPROTECT,NOLVP
+#use delay(clock=8000000)
+#use fast_io(D)
+#use fast_io(C)
+#use fast_io(B)
+#use standard_io(A)
+
+#include "lcd.h"
+#include "max30102.h"
+#include "dht11.h"
+#include "hx711.h"
+
+// HX711 buffer for moving average
+#define HX711_AVG_SAMPLES 4
+int32 weight_buffer[HX711_AVG_SAMPLES] = {0};
+int8 weight_buffer_index = 0;
+
+// Display number on LCD (optimized)
+void display_number(int32 num, int8 pos, int8 digits) {
+   if (digits == 2 && num > 99) num = 99;
+   else if (digits == 3 && num > 999) num = 999;
+   else if (digits == 5 && num > 99999) num = 99999;
+
+   LCD_SetPosition(pos);
+   int8 i, div = 1;
+   for (i = 1; i < digits; i++) div *= 10;
+   for (i = 0; i < digits; i++) {
+      if (num / div > 0 || i == digits - 1) {
+         LCD_PutChar((num / div) % 10 + '0');
+      } else {
+         LCD_PutChar(' ');
+      }
+      div /= 10;
+   }
+   delay_us(20);
+}
+
+void main() {
+   set_tris_d(0x00); // LCD on PORTD (output)
+   set_tris_c(0x00); // PORTC for I2C (MAX30102)
+   set_tris_b(0xFF); // PORTB as input (DHT11, tare button)
+   set_tris_a(0x01); // A0 input for HX711 DT, A1 output for SCK
+
+   LCD_Init();
+   delay_ms(50);
+   max30102_init();
+
+   hr_value = 0;
+   spo2_value = 0;
+   finger_detected = 0;
+   hr_update_counter = 0;
+   spo2_update_counter = 0;
+
+   // Skip initial HX711 readings
+   for (int i = 0; i < 5; i++) {
+      readCount();
+      delay_ms(10);
+   }
+   hx711_tare(10);
+
+   // Static labels
+   LCD_SetPosition(LINE_1);
+   LCD_PutChar('T'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('C');
+   LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('H'); LCD_PutChar(':');
+   LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('%');
+   LCD_SetPosition(LINE_2);
+   LCD_PutChar('H'); LCD_PutChar('R'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' ');
+   LCD_PutChar(' '); LCD_PutChar('b'); LCD_PutChar('p'); LCD_PutChar('m');
+   LCD_SetPosition(LINE_3);
+   LCD_PutChar('S'); LCD_PutChar('p'); LCD_PutChar('O'); LCD_PutChar('2'); LCD_PutChar(':');
+   LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('%');
+   LCD_SetPosition(LINE_4);
+   LCD_PutChar('W'); LCD_PutChar('e'); LCD_PutChar('i'); LCD_PutChar('g'); LCD_PutChar('h');
+   LCD_PutChar('t'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' ');
+   LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('g');
+
+   int8 max30102_counter = 0;   // MAX30102 every 15ms
+   int8 dht11_counter = 0;      // DHT11 every 500ms
+   int8 hx711_counter = 0;      // HX711 every 50ms
+   int8 display_counter = 0;    // Display every 250ms
+   
+   unsigned int8 temp = 0;
+   unsigned int8 hum = 0;
+   int32 weight_grams = 0;
+
+   while (TRUE) {
+      // MAX30102 every 15ms
+      if (max30102_counter == 0) {
+         max30102_read_and_display();
+      }
+      max30102_counter = (max30102_counter + 1) % 3; // 15ms cycle
+
+      // DHT11 every 500ms
+      if (dht11_counter == 0) {
+         dht11_read(&temp, &hum);
+      }
+      dht11_counter = (dht11_counter + 1) % 100;
+
+      // HX711 every 50ms
+      if (hx711_counter == 0) {
+         hx711_manual_tare();
+         int32 raw_weight = (int32)hx711_get_units(1);
+         if (raw_weight > 99999 || raw_weight < -99999) raw_weight = 99999; // Error check
+         weight_buffer[weight_buffer_index] = raw_weight;
+         weight_buffer_index = (weight_buffer_index + 1) % HX711_AVG_SAMPLES;
+         int32 weight_sum = 0;
+         for (int8 i = 0; i < HX711_AVG_SAMPLES; i++) {
+            weight_sum += weight_buffer[i];
+         }
+         weight_grams = weight_sum / HX711_AVG_SAMPLES;
+      }
+      hx711_counter = (hx711_counter + 1) % 10; // 50ms cycle
+
+      // Display every 250ms
+      if (display_counter == 0) {
+         display_number(temp, LINE_1 + 3, 2);
+         display_number(hum, LINE_1 + 10, 2);
+         display_number(hr_value, LINE_2 + 3, 3);
+         display_number(spo2_value, LINE_3 + 5, 3);
+         if (weight_grams > 99999) {
+            LCD_SetPosition(LINE_4 + 7);
+            LCD_PutChar('E'); LCD_PutChar('r'); LCD_PutChar('r');
+         } else {
+            display_number(weight_grams, LINE_4 + 7, 5);
+         }
+      }
+      display_counter = (display_counter + 1) % 50;
+
+      delay_ms(5);
+   }
+}

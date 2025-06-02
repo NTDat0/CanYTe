@@ -1,0 +1,158 @@
+#ifndef HX711_H
+#define HX711_H
+
+// HX711 Pin Definitions (Gi? nguyên t? code g?c c?a b?n)
+#define HX711_DT_PIN  PIN_A0
+#define HX711_SCK_PIN PIN_A1
+
+// --- Configuration Constants ---
+// S? l?n d?c thô (hx711_read_count) d? l?y trung bình trong m?t l?n g?i hx711_read_average_internal()
+#define NUM_SAMPLES_PER_AVERAGE 30 // Gi? giá tr? này g?n v?i 30 nhu code g?c c?a b?n
+
+// S? l?n g?i hx711_read_average_internal() d? l?y trung bình cho vi?c TARE
+#define NUM_AVERAGES_FOR_TARE 3 // Tare s? l?y trung bình c?a 3 * 30 = 90 l?n d?c thô
+
+// S? l?n g?i hx711_read_average_internal() d? l?y trung bình cho vi?c GET VALUE
+#define NUM_AVERAGES_FOR_VALUE 2 // Get value s? l?y trung bình c?a 2 * 30 = 60 l?n d?c thô
+
+// Ngu?ng ch?t (deadband) cho delta giá tr? thô (raw_value - OFFSET)
+#define DEADBAND_RAW_DELTA 300
+
+// Global variables for offset and scale
+// QUAN TR?NG: Các giá tr? này PH?I du?c d?t thông qua tare và calibrate.
+static long HX711_OFFSET = 0;
+static double HX711_SCALE = 1.0; // Giá tr? ban d?u, s? du?c c?p nh?t b?i calibrate
+
+// --- Function Prototypes (gi? tên hàm g?n gi?ng v?i code g?c c?a b?n) ---
+// Hàm hx711_init không có trong code g?c hx711.h c?a b?n, nhung h?u ích.
+// N?u không mu?n thêm, có th? b? qua.
+void hx711_init_pins(void);
+
+unsigned int32 readCount(void); // Gi? tên hàm g?c
+long readAverage(void);         // Gi? tên hàm g?c, nhung bên trong s? dùng NUM_SAMPLES_PER_AVERAGE
+long hx711_get_value_internal(int8 ignored_times); // Tên m?i cho hàm logic get_value cu
+float hx711_get_units(int8 ignored_times); // Gi? tên hàm g?c
+void hx711_tare(int8 ignored_times);      // Gi? tên hàm g?c
+void hx711_set_scale(double scale_val);    // Gi? tên hàm g?c
+void hx711_calibrate(float known_weight, int8 times_to_average_for_cal); // Thêm tham s? times cho calibrate
+
+// --- Function Implementations ---
+
+void hx711_init_pins(void) {
+    output_low(HX711_SCK_PIN);
+}
+
+unsigned int32 readCount(void) { // Tên hàm và logic co b?n gi? nguyên
+    unsigned int32 data = 0;
+    unsigned int8 j;
+
+    output_low(HX711_SCK_PIN);
+    while (input(HX711_DT_PIN));
+
+    for (j = 0; j < 24; j++) {
+        output_high(HX711_SCK_PIN);
+        delay_us(1);
+        data = data << 1;
+        output_low(HX711_SCK_PIN);
+        delay_us(1);
+        if (input(HX711_DT_PIN)) {
+            data++;
+        }
+    }
+    output_high(HX711_SCK_PIN);
+    delay_us(1);
+    data = data ^ 0x800000;
+    output_low(HX711_SCK_PIN);
+    delay_us(1);
+    return data;
+}
+
+// Hàm readAverage g?c c?a b?n l?y trung bình c?a 30 l?n readCount()
+// Bây gi? nó s? l?y trung bình c?a NUM_SAMPLES_PER_AVERAGE l?n.
+long readAverage(void) {
+    long sum = 0;
+    for (int8 k = 0; k < NUM_SAMPLES_PER_AVERAGE; k++) {
+        sum += readCount();
+    }
+    return sum / NUM_SAMPLES_PER_AVERAGE;
+}
+
+// Hàm này s? du?c g?i b?i hx711_tare và hx711_get_value_internal
+// d? l?y trung bình c?a nhi?u l?n readAverage()
+long hx711_get_averaged_raw(int8 num_average_cycles) {
+    long total_sum = 0;
+    if (num_average_cycles < 1) num_average_cycles = 1;
+
+    for (int8 i = 0; i < num_average_cycles; i++) {
+        total_sum += readAverage();
+        if (num_average_cycles > 1 && i < (num_average_cycles - 1)) {
+            delay_ms(5); // Delay nh? gi?a các l?n l?y average l?n
+        }
+    }
+    return total_sum / num_average_cycles;
+}
+
+// Tham s? 'ignored_times' không còn du?c s? d?ng
+void hx711_tare(int8 ignored_times) {
+    HX711_OFFSET = hx711_get_averaged_raw(NUM_AVERAGES_FOR_TARE);
+}
+
+// Hàm này tuong duong v?i hx711_get_value trong code g?c c?a b?n
+// Tham s? 'ignored_times' không còn du?c s? d?ng
+long hx711_get_value_internal(int8 ignored_times) {
+    long raw_avg_value = hx711_get_averaged_raw(NUM_AVERAGES_FOR_VALUE);
+    long delta = raw_avg_value - HX711_OFFSET;
+
+    if (delta < DEADBAND_RAW_DELTA && delta > -DEADBAND_RAW_DELTA) {
+        delta = 0;
+    }
+    return delta;
+}
+
+// Tham s? 'ignored_times' không còn du?c s? d?ng
+float hx711_get_units(int8 ignored_times) {
+    if (HX711_SCALE == 0.0) return 0.0;
+
+    long value_minus_offset = hx711_get_value_internal(1); // S? 1 ? dây không có tác d?ng
+    float weight = (float)value_minus_offset / HX711_SCALE;
+
+    // Gi?i h?n giá tr? nhu code g?c c?a b?n
+    if (weight < 0) weight = 0;
+    if (weight > 99999) weight = 99999;
+
+    return weight;
+}
+
+void hx711_set_scale(double scale_val) { // Gi? nguyên
+    HX711_SCALE = scale_val;
+}
+
+// Hàm calibrate c?n bi?t s? l?n l?y trung bình d? có giá tr? ?n d?nh
+void hx711_calibrate(float known_weight, int8 times_to_average_for_cal) {
+    if (known_weight == 0) return;
+    if (times_to_average_for_cal < 1) times_to_average_for_cal = NUM_AVERAGES_FOR_TARE; // S? d?ng s? l?n tare làm m?c d?nh
+
+    // Quan tr?ng: Ngu?i dùng nên tare tru?c khi g?i calibrate
+    // Ho?c hàm này có th? t? tare:
+    // hx711_tare(1); // G?i tare v?i s? l?n m?c d?nh c?a nó
+
+    long raw_value_with_weight = hx711_get_averaged_raw(times_to_average_for_cal);
+    long delta_for_weight = raw_value_with_weight - HX711_OFFSET;
+
+    if (delta_for_weight == 0) {
+        HX711_SCALE = 1.0;
+        return;
+    }
+    HX711_SCALE = (double)delta_for_weight / known_weight;
+}
+
+// Các hàm ti?n ích d? l?y SCALE và OFFSET n?u c?n t? bên ngoài (ví d? d? luu EEPROM)
+double hx711_get_current_scale() {
+    return HX711_SCALE;
+}
+
+long hx711_get_current_offset() {
+    return HX711_OFFSET;
+}
+
+#endif // HX711_H

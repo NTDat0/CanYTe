@@ -1,0 +1,356 @@
+ÀÄmain
+   ÀÄMAIN  3/991  Ram=21
+      ÃÄ@cinit1  (Inline)  Ram=0
+      ÃÄLCD_Init  0/47  Ram=0
+      ³  ÃÄLCD_SetData  0/37  Ram=1
+      ³  ÃÄ@delay_ms1  0/20  Ram=1
+      ³  ÃÄLCD_SetData  0/37  Ram=1
+      ³  ÃÄLCD_PulseEnable  0/9  Ram=0
+      ³  ³  ÀÄ@delay_ms1  0/20  Ram=1
+      ³  ÃÄLCD_PulseEnable  0/9  Ram=0
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PulseEnable  0/9  Ram=0
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_SetData  0/37  Ram=1
+      ³  ÃÄLCD_PulseEnable  0/9  Ram=0
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutCmd  0/21  Ram=2
+      ³  ³  ÃÄLCD_SetData  0/37  Ram=1
+      ³  ³  ÃÄLCD_PulseEnable  0/9  Ram=0
+      ³  ³  ³  ÀÄ*
+      ³  ³  ÃÄLCD_SetData  0/37  Ram=1
+      ³  ³  ÀÄLCD_PulseEnable  0/9  Ram=0
+      ³  ³     ÀÄ*
+      ³  ÃÄLCD_PutCmd  0/21  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutCmd  0/21  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÀÄLCD_PutCmd  0/21  Ram=2
+      ³     ÀÄ*
+      ÃÄ@delay_ms1  0/20  Ram=1
+      ÃÄmax30102_init  0/86  Ram=3
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÃÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ³  ÃÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ³  ÀÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ÃÄ@delay_ms1  0/20  Ram=1
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄmax30102_write  0/43  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÀÄmax30102_write  0/43  Ram=2
+      ³     ÀÄ*
+      ÃÄuart_init  0/3  Ram=0
+      ÃÄreadCount  0/98  Ram=8
+      ÃÄ@delay_ms1  0/20  Ram=1
+      ÃÄhx711_tare  0/9  Ram=1
+      ³  ÀÄreadAverage  0/101  Ram=10
+      ³     ÃÄreadCount  0/98  Ram=8
+      ³     ÀÄ@DIV3232  0/81  Ram=13
+      ÃÄ@delay_ms1  0/20  Ram=1
+      ÃÄLCD_SetPosition  0/7  Ram=2
+      ³  ÀÄLCD_PutCmd  0/21  Ram=2
+      ³     ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄLCD_PutCmd  0/21  Ram=2
+      ³     ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_SetPosition  0/7  Ram=2
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_SetPosition  0/7  Ram=2
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_SetPosition  0/7  Ram=2
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ÀÄ*
+      ÃÄhx711_tare  0/9  Ram=1
+      ³  ÀÄ*
+      ÃÄ@delay_ms1  0/20  Ram=1
+      ÃÄ@delay_ms1  0/20  Ram=1
+      ÃÄhx711_calibrate  0/127  Ram=12
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄreadAverage  0/101  Ram=10
+      ³  ³  ÀÄ*
+      ³  ÃÄ@ITOF  0/31  Ram=2
+      ³  ÃÄ@DIVFF  0/204  Ram=14
+      ³  ÀÄ@FLT  0/65  Ram=10
+      ÃÄ@delay_ms1  0/20  Ram=1
+      ÃÄmax30102_read_and_display  0/742  Ram=23
+      ³  ÃÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ÃÄmax30102_read_fifo  (Inline)  Ram=23
+      ³  ³  ÃÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ³  ÃÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ³  ÃÄ@I2C_WRITE_1  0/52  Ram=1
+      ³  ³  ÀÄ@I2C_READ_1  (Inline)  Ram=3
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÀÄ@DIV3232  0/81  Ram=13
+      ÃÄdht11_read  0/230  Ram=16
+      ³  ÀÄdht11_start  (Inline)  Ram=0
+      ³     ÀÄ@delay_ms1  0/20  Ram=1
+      ÃÄ@DIV1616  1/37  Ram=5
+      ÃÄhx711_get_units  1/639  Ram=17
+      ³  ÃÄhx711_get_value  (Inline)  Ram=5
+      ³  ³  ÀÄreadAverage  0/101  Ram=10
+      ³  ³     ÀÄ*
+      ³  ÃÄ@ITOF  0/31  Ram=2
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄ@DIVFF  0/204  Ram=14
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄ@MULFF  (Inline)  Ram=13
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄ@FLT  0/65  Ram=10
+      ³  ÃÄreadAverage  0/101  Ram=10
+      ³  ³  ÀÄ*
+      ³  ÀÄ@FLT  0/65  Ram=10
+      ÃÄ@FLT  0/65  Ram=10
+      ÃÄ@ADDFF  1/345  Ram=16
+      ÃÄ@FTOSD  1/31  Ram=5
+      ÃÄ@ADDFF  1/345  Ram=16
+      ÃÄ@FTOSD  1/31  Ram=5
+      ÃÄ@DIV1616  1/37  Ram=5
+      ÃÄdisplay_number  2/1900  Ram=16
+      ³  ÃÄLCD_SetPosition  0/7  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÃÄLCD_PutChar  0/8  Ram=1
+      ³  ³  ÀÄ*
+      ³  ÀÄLCD_PutChar  0/8  Ram=1
+      ³     ÀÄ*
+      ÃÄdisplay_number  2/1900  Ram=16
+      ³  ÀÄ*
+      ÃÄdisplay_number  2/1900  Ram=16
+      ³  ÀÄ*
+      ÃÄdisplay_number  2/1900  Ram=16
+      ³  ÀÄ*
+      ÃÄdisplay_number  2/1900  Ram=16
+      ³  ÀÄ*
+      ÃÄuart_send_data  1/600  Ram=82
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@PRINTF_U_947  1/75  Ram=2
+      ³  ³  ÃÄ@DIV88  1/23  Ram=3
+      ³  ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ³  ÃÄ@DIV88  1/23  Ram=3
+      ³  ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ³  ÀÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@PRINTF_U_947  1/75  Ram=2
+      ³  ³  ÀÄ*
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@PRINTF_L32D_947  1/202  Ram=12
+      ³  ³  ÃÄ@DIV3232  0/81  Ram=13
+      ³  ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ³  ÀÄ@DIV3232  0/81  Ram=13
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@PSTRINGCN7_947  (Inline)  Ram=5
+      ³  ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ³  ÀÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@PRINTF_L32D_947  1/202  Ram=12
+      ³  ³  ÀÄ*
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÃÄ@PRINTF_L32D_947  1/202  Ram=12
+      ³  ³  ÀÄ*
+      ³  ÃÄ@SPRINTF  0/15  Ram=1
+      ³  ÀÄuart_send_string  (Inline)  Ram=3
+      ÃÄ@DIV1616  1/37  Ram=5
+      ÀÄ@delay_ms1  0/20  Ram=1

@@ -1,0 +1,175 @@
+#include <16F877A.h>
+#fuses HS,NOWDT,NOPROTECT,NOLVP
+#use delay(clock=8000000)
+#use fast_io(D)
+#use fast_io(C)
+#use fast_io(B)
+#use standard_io(A)
+#include <stdio.h>
+
+#include "lcd.h"
+#include "max30102.h"
+#include "dht11.h"
+#include "hx711.h"
+#include "uart.h"
+
+#define MAX30102_INTERVAL_TICKS 4
+#define DHT11_INTERVAL_TICKS    100
+#define HX711_INTERVAL_TICKS    20
+#define DISPLAY_UART_INTERVAL_TICKS 50
+#define WEIGHT_DEADBAND 2
+
+// Hàm d? in m?t chu?i ký t? lên LCD
+void LCD_PrintString(char* str) {
+    while (*str) {
+        LCD_PutChar(*str++);
+    }
+}
+
+// Hàm d? xóa màn hình LCD b?ng cách ghi kho?ng tr?ng
+void LCD_ClearScreen() {
+    unsigned char i, j;
+    for (i = 0; i < 4; i++) { // Gi? s? LCD 4 dòng
+        LCD_SetPosition(0x80 + i*0x40 + (i>=2 ? 0x14-0x40:0)); // Ð?a ch? b?t d?u các dòng LCD (00, 40, 14, 54 cho 20x4)
+                                                              // Ho?c s? d?ng LINE_1, LINE_2,... n?u dã d?nh nghia dúng
+        if (i==0) LCD_SetPosition(LINE_1);
+        else if (i==1) LCD_SetPosition(LINE_2);
+        else if (i==2) LCD_SetPosition(LINE_3);
+        else if (i==3) LCD_SetPosition(LINE_4);
+
+        for (j = 0; j < 20; j++) { // Gi? s? LCD 20 c?t
+            LCD_PutChar(' ');
+        }
+    }
+    LCD_SetPosition(LINE_1); // Ð?t con tr? v? d?u dòng 1
+}
+
+
+void display_number(int32 num, int8 pos, int8 digits) {
+   if (num > 99 && digits == 2) num = 99;
+   if (num > 999 && digits == 3) num = 999;
+   if (num > 99999 && digits == 5) num = 99999;
+
+   LCD_SetPosition(pos);
+   if (digits == 2) {
+      LCD_PutChar(num / 10 + '0');
+      LCD_PutChar(num % 10 + '0');
+   } else if (digits == 3) {
+      if (num >= 100) {
+         LCD_PutChar(num / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 10) {
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num + '0');
+      }
+   } else if (digits == 5) {
+      if (num >= 10000) {
+         LCD_PutChar(num / 10000 + '0');
+         LCD_PutChar((num % 10000) / 1000 + '0');
+         LCD_PutChar((num % 1000) / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 1000) {
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 1000 + '0');
+         LCD_PutChar((num % 1000) / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 100) {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 10) {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num + '0');
+      }
+   }
+   delay_us(20);
+}
+
+void main() {
+   set_tris_d(0x00);
+   set_tris_c(0b00011000);
+   set_tris_b(0xFF);
+   set_tris_a(0x01);
+
+   LCD_Init();
+   delay_ms(50);
+   max30102_init();
+   uart_init();
+
+   hr_value = 0;
+   spo2_value = 0;
+   finger_detected = 0;
+   hr_update_counter = 0;
+   spo2_update_counter = 0;
+
+   hx711_tare(1);
+   delay_ms(100);
+
+   LCD_ClearScreen(); // S? d?ng hàm xóa màn hình m?i
+   LCD_SetPosition(LINE_1); LCD_PrintString("T:   C   H:   %");
+   LCD_SetPosition(LINE_2); LCD_PrintString("HR:   bpm      ");
+   LCD_SetPosition(LINE_3); LCD_PrintString("SpO2:   %     ");
+   LCD_SetPosition(LINE_4); LCD_PrintString("Weight:     g");
+
+   int8 max30102_tick_counter = 0;
+   int8 dht11_tick_counter = 0;
+   int8 hx711_tick_counter = 0;
+   int8 display_uart_tick_counter = 0;
+
+   unsigned int8 temp = 0;
+   unsigned int8 hum = 0;
+   int32 weight_grams = 0;
+
+   while (TRUE) {
+      if (max30102_tick_counter == 0) {
+         max30102_read_and_display();
+      }
+      max30102_tick_counter = (max30102_tick_counter + 1) % MAX30102_INTERVAL_TICKS;
+
+      if (dht11_tick_counter == 0) {
+         dht11_read(&temp, &hum);
+      }
+      dht11_tick_counter = (dht11_tick_counter + 1) % DHT11_INTERVAL_TICKS;
+
+      if (hx711_tick_counter == 0) {
+         weight_grams = (int32)hx711_get_units(1);
+         if (weight_grams < WEIGHT_DEADBAND && weight_grams > -WEIGHT_DEADBAND) {
+            weight_grams = 0;
+         } else if (weight_grams < 0) {
+             weight_grams = 0;
+         }
+      }
+      hx711_tick_counter = (hx711_tick_counter + 1) % HX711_INTERVAL_TICKS;
+
+      if (display_uart_tick_counter == 0) {
+         display_number(temp, LINE_1 + 3, 2);
+         display_number(hum, LINE_1 + 11, 2);
+         display_number(hr_value, LINE_2 + 4, 3);
+         display_number(spo2_value, LINE_3 + 6, 3);
+         display_number(weight_grams, LINE_4 + 8, 5);
+         uart_send_data(temp, hum, hr_value, spo2_value, weight_grams);
+      }
+      display_uart_tick_counter = (display_uart_tick_counter + 1) % DISPLAY_UART_INTERVAL_TICKS;
+
+      delay_ms(5);
+   }
+}

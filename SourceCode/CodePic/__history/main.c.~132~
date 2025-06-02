@@ -1,0 +1,151 @@
+#include <16F877A.h>
+#fuses HS,NOWDT,NOPROTECT,NOLVP
+#use delay(clock=8000000)
+#use fast_io(D)
+#use fast_io(C)
+#use fast_io(B)
+#use standard_io(A)
+
+#include "lcd.h"
+#include "max30102.h"
+#include "dht11.h"
+#include "hx711.h"
+
+// Display number on LCD (support 2, 3, or 5 digits)
+void display_number(int32 num, int8 pos, int8 digits) {
+   if (num > 99 && digits == 2) num = 99; // Limit to 2 digits for T, H
+   if (num > 999 && digits == 3) num = 999; // Limit to 3 digits for HR, SpO2
+   if (num > 99999 && digits == 5) num = 99999; // Limit to 5 digits for weight
+
+   LCD_SetPosition(pos);
+   if (digits == 2) {
+      LCD_PutChar(num / 10 + '0'); // Tens digit
+      LCD_PutChar(num % 10 + '0'); // Units digit
+   } else if (digits == 3) {
+      if (num >= 100) {
+         LCD_PutChar(num / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 10) {
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num + '0');
+      }
+   } else if (digits == 5) {
+      if (num >= 10000) {
+         LCD_PutChar(num / 10000 + '0');
+         LCD_PutChar((num % 10000) / 1000 + '0');
+         LCD_PutChar((num % 1000) / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 1000) {
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 1000 + '0');
+         LCD_PutChar((num % 1000) / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 100) {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 100 + '0');
+         LCD_PutChar((num % 100) / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else if (num >= 10) {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num / 10 + '0');
+         LCD_PutChar(num % 10 + '0');
+      } else {
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(' ');
+         LCD_PutChar(num + '0');
+      }
+   }
+   delay_us(20);
+}
+
+void main() {
+   set_tris_d(0x00); // LCD on PORTD (output)
+   set_tris_c(0x00); // PORTC for I2C (MAX30102)
+   set_tris_b(0xFF); // PORTB as input (for DHT11)
+   set_tris_a(0x01); // A0 as input for HX711 DT, A1 as output for HX711 SCK
+
+   // Initialize modules
+   LCD_Init();
+   delay_ms(50);
+   max30102_init();
+
+   // B? qua vài m?u d?u tiên d? HX711 ?n d?nh
+   for (int i = 0; i < 5; i++) {
+      readCount();
+      delay_ms(10);
+   }
+   // Tare ban d?u
+   hx711_tare(1);
+
+   // Display static labels with units
+   LCD_SetPosition(LINE_1); // Line 1: Temp and Humidity
+   LCD_PutChar('T'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(0xDF); LCD_PutChar('C'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('H'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('%');
+   LCD_SetPosition(LINE_2); // Line 2: HR
+   LCD_PutChar('H'); LCD_PutChar('R'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('b'); LCD_PutChar('p'); LCD_PutChar('m');
+   LCD_SetPosition(LINE_3); // Line 3: SpO2
+   LCD_PutChar('S'); LCD_PutChar('p'); LCD_PutChar('O'); LCD_PutChar('2'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('%');
+   LCD_SetPosition(LINE_4); // Line 4: Weight (in grams)
+   LCD_PutChar('W'); LCD_PutChar('e'); LCD_PutChar('i'); LCD_PutChar('g'); LCD_PutChar('h'); LCD_PutChar('t'); LCD_PutChar(':'); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar(' '); LCD_PutChar('g');
+
+   int8 update_counter = 0;
+   int8 hx711_counter = 0; // Ð?m d? d?c HX711 m?i 500ms
+   int8 dht11_counter = 0; // Ð?m d? d?c DHT11 m?i 1000ms
+   unsigned int8 temp = 0;
+   unsigned int8 hum = 0;
+   int32 weight_grams = 0;
+   int8 zero_counter = 0; // Ð?m d? t? d?ng tare khi không có v?t
+
+   while (TRUE) {
+      // Ð?c MAX30102 m?i 50ms
+      if (update_counter == 0) {
+         max30102_read_and_display();
+      }
+
+      // Ð?c DHT11 m?i 1000ms
+      if (dht11_counter == 0) {
+         dht11_read(&temp, &hum);
+      }
+      dht11_counter = (dht11_counter + 1) % 20; // C?p nh?t m?i 1000ms (20 × 50ms)
+
+      // Ð?c HX711 m?i 500ms
+      if (hx711_counter == 0) {
+         weight_grams = (int32)hx711_get_units(3); // Ð?c cân n?ng, trung bình 3 l?n
+         // T? d?ng tare n?u giá tr? g?n 0 trong 5s
+         if (weight_grams >= -1 && weight_grams <= 1) {
+            zero_counter++;
+            if (zero_counter >= 10) { // 10 × 500ms = 5s
+               hx711_tare(1);
+               zero_counter = 0;
+            }
+         } else {
+            zero_counter = 0;
+         }
+      }
+      hx711_counter = (hx711_counter + 1) % 10; // C?p nh?t m?i 500ms (10 × 50ms)
+
+      // C?p nh?t LCD m?i 500ms
+      if (update_counter == 0) {
+         display_number(temp, LINE_1 + 3, 2);
+         display_number(hum, LINE_1 + 10, 2);
+         display_number(hr_value, LINE_2 + 3, 3);
+         display_number(spo2_value, LINE_3 + 5, 3);
+         display_number(weight_grams, LINE_4 + 7, 5);
+      }
+
+      update_counter = (update_counter + 1) % 10; // Chu k? 50ms
+      delay_ms(50); // Ð?i 50ms m?i chu k?
+   }
+}

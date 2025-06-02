@@ -1,0 +1,65 @@
+#ifndef HX711_H
+#define HX711_H
+
+#define HX711_DT PIN_A0 // Chân DOUT
+#define HX711_SCK PIN_A1 // Chân SCK
+double SCALE = 36; // H? s? t? l?
+long offset = 0; // Giá tr? tare ban d?u
+
+// Ð?c d? li?u t? HX711
+unsigned int32 readCount(void) {
+   unsigned int32 data;
+   unsigned int8 j;
+   output_bit(HX711_DT, 1);
+   output_bit(HX711_SCK, 0);
+   data = 0;
+
+   while (input(HX711_DT));
+   for (j = 0; j < 24; j++) {
+      output_bit(HX711_SCK, 1);
+      data = data << 1;
+      output_bit(HX711_SCK, 0);
+      if (input(HX711_DT)) {
+         data++;
+      }
+   }
+   output_bit(HX711_SCK, 1);
+   data = data ^ 0x800000;
+   output_bit(HX711_SCK, 0);
+   return data;
+}
+
+// L?y giá tr? trung bình
+int32 readAverage(void) {
+   unsigned int32 sum = 0;
+   for (int k = 0; k < 5; k++) { // Gi?m t? 20 xu?ng 5 m?u
+      sum = sum + readCount();
+      delay_ms(2);
+   }
+   sum = sum / 5;
+   return sum;
+}
+
+// Tính tr?ng lu?ng
+float get_weight(void) {
+   unsigned int32 read1 = readAverage();
+   float gram = 0;
+   if (offset >= read1) {
+      gram = (offset - read1);
+   } else {
+      gram = (read1 - offset);
+   }
+   float weight = gram / SCALE;
+   if (weight < 0) weight = 0; // Tránh giá tr? âm
+   if (weight > 999.99) weight = 999.99; // Gi?i h?n hi?n th?
+   if (weight < 0.1) weight = 0; // Giá tr? nh? hon 0.1g thì coi là 0g
+   return weight;
+}
+
+// Kh?i t?o HX711 (do tare ban d?u)
+void hx711_init() {
+   delay_ms(6000); // Ð?i 6 giây d? ?n d?nh
+   offset = readAverage();
+}
+
+#endif

@@ -1,0 +1,70 @@
+#ifndef HX711_H
+#define HX711_H
+
+// HX711 Pin Definitions
+#define HX711_DT_PIN PIN_A0
+#define HX711_SCK_PIN PIN_A1
+
+// Global variables for offset and scale
+long OFFSET = 0;
+double SCALE = 349.5; // Adjusted from 328.5 to 349.5 to balance 34g (~33g) and 38g (~44g) readings
+
+// Function to read raw data from HX711
+unsigned int32 readCount(void) {
+   unsigned int32 data = 0;
+   unsigned int8 j;
+
+   output_bit(HX711_DT_PIN, 1);
+   output_bit(HX711_SCK_PIN, 0);
+
+   while (input(HX711_DT_PIN));
+   for (j = 0; j < 24; j++) {
+      output_bit(HX711_SCK_PIN, 1);
+      data = data << 1;
+      output_bit(HX711_SCK_PIN, 0);
+      if (input(HX711_DT_PIN)) {
+         data++;
+      }
+   }
+   output_bit(HX711_SCK_PIN, 1);
+   data = data ^ 0x800000;
+   output_bit(HX711_SCK_PIN, 0);
+   return data;
+}
+
+// Function to read average raw value
+int32 readAverage(void) {
+   unsigned int32 sum = 0;
+   for (int k = 0; k < 50; k++) { // Increased from 20 to 50 samples for better stability
+      sum = sum + readCount();
+   }
+   return sum / 50;
+}
+
+// Function to get value (raw - offset)
+long hx711_get_value(int8 times) {
+   long raw_value = readAverage();
+   long delta = raw_value - OFFSET;
+   if (delta < 500 && delta > -500) delta = 0; // Reduced noise threshold from ±1000 to ±500
+   return delta;
+}
+
+// Function to get weight in grams
+float hx711_get_units(int8 times) {
+   float value = (float)hx711_get_value(times) / SCALE;
+   if (value < 0) value = 0; // Ensure non-negative
+   if (value > 99999) value = 99999; // Limit to 5 digits
+   return value;
+}
+
+// Function to tare (set offset)
+void hx711_tare(int8 times) {
+   OFFSET = readAverage();
+}
+
+// Function to set scale factor
+void hx711_set_scale(double scale) {
+   SCALE = scale;
+}
+
+#endif

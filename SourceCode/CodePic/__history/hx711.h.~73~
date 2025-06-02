@@ -1,0 +1,183 @@
+#ifndef HX711_H
+#define HX711_H
+
+// HX711 Pin Definitions (Gi? nguyên t? code g?c c?a b?n)
+#define HX711_DT_PIN  PIN_A0
+#define HX711_SCK_PIN PIN_A1
+
+// --- Configuration Constants ---
+// S? l?n d?c thô d? l?y trung bình trong hàm readAverage()
+// Tang giá tr? này d? tang d? ?n d?nh, gi?m d? tang t?c d? ph?n h?i.
+#define NUM_READS_AVERAGE 50
+
+// S? l?n l?y m?u hx711_get_value_raw() d? tính giá tr? cu?i cùng trong hx711_get_value()
+// Giúp gi?m nhi?u nh?t th?i khi d?t v?t lên.
+#define NUM_GET_VALUE_SAMPLES 3
+
+// Ngu?ng ch?t (deadband) cho delta giá tr? thô (raw_value - OFFSET)
+// N?u delta n?m trong kho?ng (-DEADBAND, +DEADBAND), nó s? du?c coi là 0.
+// Ði?u ch?nh giá tr? này d?a trên m?c d? nhi?u c?a h? th?ng khi không có t?i.
+#define DEADBAND_RAW_DELTA 300
+
+// Global variables for offset and scale
+// QUAN TR?NG: Các giá tr? này PH?I du?c d?t thông qua tare và calibrate.
+static long HX711_OFFSET = 0;    // S? d?ng static d? gi?i h?n ph?m vi trong file này
+static double HX711_SCALE = 1.0; // Giá tr? ban d?u, s? du?c c?p nh?t b?i calibrate
+
+// --- Function Prototypes ---
+void hx711_init(void);           // Hàm kh?i t?o (tùy ch?n, có th? dùng d? set SCK ban d?u)
+unsigned int32 hx711_read_count(void);
+long hx711_read_average(int8 num_times);
+void hx711_tare(int8 times_to_average);
+void hx711_set_scale(double scale_val);
+double hx711_get_scale(void);
+void hx711_set_offset(long offset_val);
+long hx711_get_offset(void);
+void hx711_calibrate(float known_weight, int8 times_to_average_for_cal);
+long hx711_get_value_raw(void); // Ð?c giá tr? thô dã tr? offset
+float hx711_get_units(void);    // L?y giá tr? tr?ng lu?ng dã du?c scale
+
+// --- Function Implementations ---
+
+void hx711_init(void) {
+    // Ð?m b?o SCK ? tr?ng thái th?p ban d?u
+    output_low(HX711_SCK_PIN);
+    // Các kh?i t?o khác n?u c?n
+}
+
+// Function to read raw data from HX711
+unsigned int32 hx711_read_count(void) {
+    unsigned int32 data = 0;
+    unsigned int8 j;
+
+    // Ð?m b?o SCK th?p tru?c khi b?t d?u d?c
+    output_low(HX711_SCK_PIN);
+
+    // Ch? cho chân DT xu?ng th?p, báo hi?u d? li?u s?n sàng
+    while (input(HX711_DT_PIN));
+
+    for (j = 0; j < 24; j++) {
+        output_high(HX711_SCK_PIN);
+        delay_us(1); // Gi? SCK cao m?t chút
+        data = data << 1;
+        output_low(HX711_SCK_PIN);
+        delay_us(1); // Gi? SCK th?p m?t chút
+        if (input(HX711_DT_PIN)) {
+            data++;
+        }
+    }
+
+    // Xung clock th? 25 d? d?t gain là 128 cho l?n d?c ti?p theo (kênh A)
+    output_high(HX711_SCK_PIN);
+    delay_us(1);
+    data = data ^ 0x800000; // X? lý giá tr? bù 2 (nhu code g?c c?a b?n)
+    output_low(HX711_SCK_PIN);
+    delay_us(1);
+
+    return data;
+}
+
+// Function to read average raw value
+// num_times: s? l?n g?i hx711_read_count() d? l?y trung bình
+long hx711_read_average(int8 num_times) {
+    long sum = 0;
+    if (num_times < 1) num_times = 1;
+    if (num_times > 100) num_times = 100; // Gi?i h?n d? tránh treo quá lâu
+
+    for (int8 k = 0; k < num_times; k++) {
+        sum += hx711_read_count();
+        // Có th? thêm delay nh? ? dây n?u c?n thi?t gi?a các l?n d?c,
+        // nhung thu?ng hx711_read_count() dã có d? tr? nh?t d?nh.
+        // delay_ms(1);
+    }
+    return sum / num_times;
+}
+
+// Function to tare (set offset)
+// times_to_average: s? l?n d?c d? l?y trung bình cho vi?c tare
+void hx711_tare(int8 times_to_average) {
+    if (times_to_average < 1) times_to_average = NUM_READS_AVERAGE;
+    HX711_OFFSET = hx711_read_average(times_to_average);
+}
+
+// Function to set scale factor
+void hx711_set_scale(double scale_val) {
+    HX711_SCALE = scale_val;
+}
+
+// Function to get current scale factor
+double hx711_get_scale(void) {
+    return HX711_SCALE;
+}
+
+// Function to set offset (n?u mu?n d?t th? công)
+void hx711_set_offset(long offset_val) {
+    HX711_OFFSET = offset_val;
+}
+
+// Function to get current offset
+long hx711_get_offset(void) {
+    return HX711_OFFSET;
+}
+
+
+// Function to calibrate scale with a known weight
+// known_weight: Tr?ng lu?ng dã bi?t (ví d?: 100.0 cho 100g)
+// times_to_average_for_cal: s? l?n d?c d? l?y trung bình khi hi?u chu?n
+void hx711_calibrate(float known_weight, int8 times_to_average_for_cal) {
+    if (known_weight == 0) return; // Ngan chia cho 0
+    if (times_to_average_for_cal < 1) times_to_average_for_cal = NUM_READS_AVERAGE;
+
+    // Ð?m b?o dã tare tru?c khi d?t v?t n?ng lên d? hi?u chu?n
+    // B?n có th? mu?n ngu?i dùng tare riêng, sau dó d?t v?t lên và g?i calibrate.
+    // Ho?c, hàm calibrate t? tare:
+    // hx711_tare(times_to_average_for_cal);
+    // printf("Calibrate: Tare done. Place known weight and press a key.\r\n");
+    // while(!kbhit()); getc(); // Ð?i ngu?i dùng xác nh?n dã d?t v?t n?ng
+
+    long raw_value_with_weight = hx711_read_average(times_to_average_for_cal);
+    long delta_for_weight = raw_value_with_weight - HX711_OFFSET;
+
+    if (delta_for_weight == 0) { // Tránh chia cho 0 n?u không có s? thay d?i
+        HX711_SCALE = 1.0; // Ho?c m?t giá tr? m?c d?nh/l?i
+        return;
+    }
+    HX711_SCALE = (double)delta_for_weight / known_weight;
+}
+
+// Function to get raw value (raw_value_averaged - OFFSET)
+// Hàm này s? l?y trung bình c?a NUM_GET_VALUE_SAMPLES l?n d?c (m?i l?n d?c là m?t giá tr? dã du?c average)
+long hx711_get_value_raw(void) {
+    long sum_delta = 0;
+    for (int8 i = 0; i < NUM_GET_VALUE_SAMPLES; i++) {
+        long current_raw = hx711_read_average(NUM_READS_AVERAGE);
+        sum_delta += (current_raw - HX711_OFFSET);
+        if (NUM_GET_VALUE_SAMPLES > 1 && i < (NUM_GET_VALUE_SAMPLES - 1) ) {
+             delay_ms(20); // Ch? m?t chút gi?a các l?n l?y m?u l?n
+        }
+    }
+    long delta = sum_delta / NUM_GET_VALUE_SAMPLES;
+
+    // Áp d?ng deadband
+    if (delta < DEADBAND_RAW_DELTA && delta > -DEADBAND_RAW_DELTA) {
+        delta = 0;
+    }
+    return delta;
+}
+
+// Function to get weight in desired units (e.g., grams)
+float hx711_get_units(void) {
+    if (HX711_SCALE == 0.0) { // Tránh chia cho 0 n?u scale chua du?c d?t ho?c là 0
+        return 0.0;
+    }
+    long raw_val_minus_offset = hx711_get_value_raw();
+    float weight = (float)raw_val_minus_offset / HX711_SCALE;
+
+    // Ð?m b?o không âm và gi?i h?n giá tr? (tùy ch?n)
+    // if (weight < 0) weight = 0;
+    // if (weight > 99999) weight = 99999; // Ví d? gi?i h?n 5 ch? s?
+
+    return weight;
+}
+
+#endif // HX711_H

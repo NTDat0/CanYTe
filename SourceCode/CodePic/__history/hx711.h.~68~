@@ -1,0 +1,212 @@
+#ifndef HX711_H
+#define HX711_H
+
+// HX711 Pin Definitions
+#define HX711_DT_PIN    PIN_A0
+#define HX711_SCK_PIN   PIN_A1
+
+// Configuration constants
+#define HX711_SAMPLES   30      // S? m?u d? tính trung bình
+#define HX711_NOISE_THRESHOLD 300  // Ngu?ng nhi?u ±300
+#define HX711_MAX_WEIGHT 99999  // Gi?i h?n tr?ng lu?ng t?i da
+
+// Global variables for offset and scale
+long OFFSET = 0;
+double SCALE = 377.0;  // Gi? nguyên SCALE = 377.0 dã du?c hi?u ch?nh
+
+// Status flags
+bit hx711_ready = 0;
+bit hx711_stable = 0;
+
+// Function prototypes
+unsigned int32 readCount(void);
+int32 readAverage(void);
+long hx711_get_value(int8 times);
+float hx711_get_units(int8 times);
+void hx711_tare(int8 times);
+void hx711_set_scale(double scale);
+void hx711_calibrate(float known_weight);
+void hx711_power_down(void);
+void hx711_power_up(void);
+bit hx711_is_ready(void);
+
+// Function to check if HX711 is ready
+bit hx711_is_ready(void) {
+   return !input(HX711_DT_PIN);
+}
+
+// Function to power down HX711
+void hx711_power_down(void) {
+   output_bit(HX711_SCK_PIN, 0);
+   output_bit(HX711_SCK_PIN, 1);
+   hx711_ready = 0;
+}
+
+// Function to power up HX711
+void hx711_power_up(void) {
+   output_bit(HX711_SCK_PIN, 0);
+   delay_ms(400);  // Th?i gian ?n d?nh
+   hx711_ready = 1;
+}
+
+// Function to read raw data from HX711 with timeout protection
+unsigned int32 readCount(void) {
+   unsigned int32 data = 0;
+   unsigned int8 j;
+   unsigned int16 timeout = 0;
+   
+   // Ð?m b?o chân SCK ? m?c th?p
+   output_bit(HX711_SCK_PIN, 0);
+   
+   // Ch? HX711 s?n sàng v?i timeout
+   while (input(HX711_DT_PIN)) {
+      delay_us(10);
+      timeout++;
+      if (timeout > 10000) {  // Timeout 100ms
+         return 0;  // Tr? v? 0 n?u timeout
+      }
+   }
+   
+   // Ð?c 24 bit d? li?u
+   for (j = 0; j < 24; j++) {
+      output_bit(HX711_SCK_PIN, 1);
+      delay_us(1);  // Delay nh? d? d?m b?o timing
+      data = data << 1;
+      output_bit(HX711_SCK_PIN, 0);
+      delay_us(1);
+      if (input(HX711_DT_PIN)) {
+         data++;
+      }
+   }
+   
+   // Pulse th? 25 d? thi?t l?p gain (128 cho channel A)
+   output_bit(HX711_SCK_PIN, 1);
+   delay_us(1);
+   data = data ^ 0x800000;  // Chuy?n d?i t? unsigned sang signed
+   output_bit(HX711_SCK_PIN, 0);
+   delay_us(1);
+   
+   return data;
+}
+
+// Function to read average raw value with error checking
+int32 readAverage(void) {
+   unsigned int32 sum = 0;
+   unsigned int32 valid_samples = 0;
+   unsigned int32 sample;
+   int8 k;
+   
+   for (k = 0; k < HX711_SAMPLES; k++) {
+      sample = readCount();
+      if (sample != 0) {  // B? qua các m?u l?i (timeout)
+         sum += sample;
+         valid_samples++;
+      }
+      delay_ms(1);  // Delay nh? gi?a các l?n d?c
+   }
+   
+   if (valid_samples == 0) return 0;  // Tránh chia cho 0
+   return sum / valid_samples;
+}
+
+// Function to get value (raw - offset) with noise filtering
+long hx711_get_value(int8 times) {
+   long raw_value = readAverage();
+   long delta = raw_value - OFFSET;
+   
+   // L?c nhi?u v?i ngu?ng có th? di?u ch?nh
+   if (delta < HX711_NOISE_THRESHOLD && delta > -HX711_NOISE_THRESHOLD) {
+      delta = 0;
+   }
+   
+   return delta;
+}
+
+// Function to get weight in grams with bounds checking
+float hx711_get_units(int8 times) {
+   float value = (float)hx711_get_value(times) / SCALE;
+   
+   // Ð?m b?o giá tr? h?p l?
+   if (value < 0) value = 0;  // Không cho phép giá tr? âm
+   if (value > HX711_MAX_WEIGHT) value = HX711_MAX_WEIGHT;  // Gi?i h?n t?i da
+   
+   return value;
+}
+
+// Function to tare (set offset) with multiple readings for accuracy
+void hx711_tare(int8 times) {
+   unsigned int32 sum = 0;
+   int8 i;
+   
+   // Ð?c nhi?u l?n d? tính offset chính xác hon
+   for (i = 0; i < (times > 0 ? times : 10); i++) {
+      sum += readAverage();
+      delay_ms(10);
+   }
+   
+   OFFSET = sum / (times > 0 ? times : 10);
+   hx711_stable = 1;  // Ðánh d?u dã tare
+}
+
+// Function to set scale factor with validation
+void hx711_set_scale(double scale) {
+   if (scale > 0) {  // Ch? ch?p nh?n scale duong
+      SCALE = scale;
+   }
+}
+
+// Function to calibrate scale with a known weight
+void hx711_calibrate(float known_weight) {
+   long raw_value;
+   
+   if (known_weight <= 0) return;  // Ngan chia cho 0 ho?c giá tr? âm
+   
+   printf("Calibrating with %.2fg...\r\n", known_weight);
+   
+   // Tare tru?c khi hi?u ch?nh
+   printf("Remove all weight and press any key...\r\n");
+   getc();  // Ch? ngu?i dùng
+   hx711_tare(10);
+   
+   printf("Place %.2fg weight and press any key...\r\n", known_weight);
+   getc();  // Ch? ngu?i dùng d?t tr?ng lu?ng chu?n
+   
+   raw_value = readAverage();
+   SCALE = (float)(raw_value - OFFSET) / known_weight;
+   
+   printf("Calibration complete. New scale: %.2f\r\n", SCALE);
+}
+
+// Function to get stable reading (multiple samples with consistency check)
+float hx711_get_stable_units(void) {
+   float readings[5];
+   float sum = 0;
+   float avg, variance = 0;
+   int8 i;
+   
+   // L?y 5 m?u
+   for (i = 0; i < 5; i++) {
+      readings[i] = hx711_get_units(1);
+      sum += readings[i];
+      delay_ms(50);
+   }
+   
+   avg = sum / 5.0;
+   
+   // Tính variance d? ki?m tra d? ?n d?nh
+   for (i = 0; i < 5; i++) {
+      float diff = readings[i] - avg;
+      variance += diff * diff;
+   }
+   variance /= 5.0;
+   
+   // N?u variance th?p (?n d?nh), tr? v? giá tr? trung bình
+   if (variance < 1.0) {  // Ngu?ng variance có th? di?u ch?nh
+      return avg;
+   }
+   
+   // N?u không ?n d?nh, tr? v? giá tr? don l?
+   return hx711_get_units(1);
+}
+
+#endif
